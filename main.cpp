@@ -8,9 +8,12 @@
 #include <random>
 #include <functional>
 #include <queue>
+#include <cmath>
 
 using namespace std;
 
+#define LONGUEUR 100
+#define EPSILON 0.1
 #define K 20
 #define DELTA 10
 
@@ -109,23 +112,22 @@ vector<double> Fct_Repart(ifstream &fichier){
     if(fonction.empty()) fonction.push_back(stod(mot));
     else fonction.push_back(fonction.back()+stod(mot));
   }
-  cout << fonction.back() << endl;
   return fonction;
 }
 
 void afficher_evenement(event e){
   switch (e.type_event) {
     case TIC:
-        // cout << "evenement : " << "TIC" << " " <<e.date << " " <<e.station << endl;
+         // cout << "evenement : " << "TIC" << " " <<e.date << " " <<e.station << endl;
       break;
     case ARRIVEE_CONTENEUR:
-      // cout << "evenement : "<< "ARRIVEE_CONTENEUR" << " " <<e.date << " " <<e.station << endl;
+       // cout << "evenement : "<< "ARRIVEE_CONTENEUR" << " " <<e.date << " " <<e.station << endl;
       break;
     case ENTREE_CONTENEUR :
-      // cout << "evenement : "<< "ENTREE_CONTENEUR" << " " <<e.date << " " <<e.station << endl;
+       // cout << "evenement : "<< "ENTREE_CONTENEUR" << " " <<e.date << " " <<e.station << endl;
       break;
     case SORTIE_CONTENEUR :
-      // cout << "evenement : "<< "SORTIE_CONTENEUR" << " " <<e.date << " " <<e.station << endl;
+       // cout << "evenement : "<< "SORTIE_CONTENEUR" << " " <<e.date << " " <<e.station << endl;
       break;
     default :
       break;
@@ -182,7 +184,7 @@ int dernier_paquet(ANNEAU *A , int station){
   return DELTA;
 }
 
-void Arrivee_Conteneur(ANNEAU *anneau, STATION *s, int station, Echeancier *e, double valeur, vector<double> fonction ) {
+void Arrivee_Conteneur(ANNEAU *anneau, STATION *s, int station, Echeancier *e, vector<double> fonction ) {
   PAQUETS p1;
   event E1;
   //Creation de l'evenement Entree Conteneur
@@ -201,12 +203,6 @@ void Arrivee_Conteneur(ANNEAU *anneau, STATION *s, int station, Echeancier *e, d
   }
   else{
      attenteS=0;
-  }
-  //int attenteS =(count_station(s,station)-1)*DELTA;
-  if(E1.station == 0){
-    // std::cout << "attente : " << attenteA+attenteS << '\n';
-    // std::cout << "attenteA : " << attenteA << '\n';
-    // std::cout << "attenteS : " << attenteS << '\n';
   }
   // Calcul de la date
   E1.date=horloge+attenteA+attenteS;
@@ -277,41 +273,35 @@ void Entree_Conteneur(Anneau *a, STATION *s, Echeancier *e, int station,donneAnn
         da->MoyenneStation1.push_back((E.date-da->MoyenneStation1.at(0))/(da->EmissionStation1.size()+1));
       }
       da->EmissionStation1.push_back(E.date);
-      //std::cout << "attente : " << E.date-E.tmpArrivee << '\n';
     }
     if(E1.station == 9){
-      da->EmissionStation10.push_back(E.date-E.tmpArrivee);
+
       if (da->MoyenneStation10.empty()) {
-        da->MoyenneStation10.push_back(da->EmissionStation10.back());
+        da->MoyenneStation10.push_back(E.date);
       }
       else {
-        da->MoyenneStation10.push_back((da->EmissionStation10.back()+E.date*1.0)/da->EmissionStation10.size());
+          da->MoyenneStation10.push_back((E.date-da->MoyenneStation10.at(0))/(da->EmissionStation10.size()+1));
       }
+      da->EmissionStation10.push_back(E.date);
     }
-    // std::cout << "Paquets "<< station << " a été traité" << '\n';
-    // std::cout << "nombre de paquets traités = " << paquets_traites<< '\n';
+
     s->v.erase(s->v.begin()+supression_paquet(s,station));
   }
 }
 
 void Sortie_Conteneur(Anneau *a,int station) {
-  // std::cout << "je suis sortie_conteneur" << '\n';
   a->anneau.at((150/K)*station)=-1;
-  //std::cout << "Paquets "<<station << " est sorti" << '\n';
 }
 
-void exec_evenement(echeancier *e,ANNEAU *anneau , STATION *station ,double valeur ,vector<double> fonction ,AnneauDonne *AD){
+void exec_evenement(echeancier *e,ANNEAU *anneau , STATION *station,vector<double> fonction ,AnneauDonne *AD){
   event E1;
-  //std::cout << "taille : "<<e->echeancier.size() << '\n';
   while (e->echeancier.top().date==horloge) {
-    afficher_evenement(e->echeancier.top());
-    //std::cout << "echeancier tailles : " <<e->echeancier.size() << '\n';
     switch (e->echeancier.top().type_event) {
       case TIC:
         E1=e->echeancier.top();
         break;
       case ARRIVEE_CONTENEUR:
-        Arrivee_Conteneur(anneau,station,e->echeancier.top().station,e,valeur,fonction);
+        Arrivee_Conteneur(anneau,station,e->echeancier.top().station,e,fonction);
         break;
       case ENTREE_CONTENEUR :
         Entree_Conteneur(anneau, station,e, e->echeancier.top().station,AD, e->echeancier.top());
@@ -330,6 +320,17 @@ void exec_evenement(echeancier *e,ANNEAU *anneau , STATION *station ,double vale
   horloge++;
 }
 
+bool verif_condition(vector<double> *v){
+  if (v->size()<LONGUEUR+2) return false;
+  int i = v->size()-101;
+  while (i < v->size()) {
+    if (abs(v->at(i)-v->at(v->size()-1))>EPSILON) {
+      return false;
+    }
+    i++;
+  }
+  return true;
+}
 
 void simulation(ANNEAU *anneau , STATION *station, echeancier* e){
   AnneauDonne AD;
@@ -344,17 +345,12 @@ void simulation(ANNEAU *anneau , STATION *station, echeancier* e){
   for (int i = 0; i < K; i++) {
     init_echeancier(e,dist(rng),inter_arrivees,i);
   }
-  while (horloge < 13000) {
-    //std::cout << "TEMPS" << horloge << '\n' << '\n';
-    exec_evenement(e,anneau,station,dist(rng),inter_arrivees,&AD);
+  while (!(verif_condition(&AD.MoyenneStation1))||!(verif_condition(&AD.MoyenneStation10)) ) {
+    exec_evenement(e,anneau,station,inter_arrivees,&AD);
   }
   Ecrire_Remplissage_Anneau("remplissageAnneau",AD.remplissageAnneau);
   Ecrire_Attente_Station("Station1",AD.EmissionStation1,AD.MoyenneStation1);
   Ecrire_Attente_Station("Station10", AD.EmissionStation10, AD.MoyenneStation10);
-  std::cout << "taille echeancier : "<<e->echeancier.size() << '\n';
-  std::cout << "paquets_totaux : " <<paquets_totaux<< '\n';
-  std::cout << "paquets_traites : " <<paquets_traites<< '\n';
-
 }
 
 
