@@ -24,8 +24,10 @@ int paquets_traites=0;
 
 typedef struct donneAnneau{
   vector<int> remplissageAnneau;
-  vector<int> AttenteStation1;
-  vector<int> AttenteStation10;
+  vector<double> MoyenneStation1;
+  vector<double> MoyenneStation10;
+  vector<int> EmissionStation1;
+  vector<int> EmissionStation10;
 }AnneauDonne;
 
 enum type {
@@ -51,7 +53,6 @@ struct Comparedate{
  typedef struct Echeancier{
    priority_queue<event,std::vector<event> ,Comparedate> echeancier;
  }echeancier;
-
 
 typedef struct paquets{
   int num_paquet;
@@ -210,9 +211,6 @@ void Arrivee_Conteneur(ANNEAU *anneau, STATION *s, int station, Echeancier *e, d
   // Calcul de la date
   E1.date=horloge+attenteA+attenteS;
   E1.tmpArrivee=horloge;
-  if(E1.station == 0){
-    cout << "Date : " << E1.date << " || Temps arrivée : " << E1.tmpArrivee << "|| Paquets : " << attenteA << endl;
-  }
   s->v.push_back(p1);
   paquets_totaux++;
   e->echeancier.push(E1);
@@ -232,7 +230,7 @@ int supression_paquet(STATION *S , int station){
   return -1;
 }
 
-void Ecrire_Fichier(string fichierSortie, vector<int> v){
+void Ecrire_Remplissage_Anneau(string fichierSortie, vector<int> v){
   std::ofstream os(fichierSortie);
   if(os.is_open()){
     for (int i = 0; i < v.size(); i++) {
@@ -242,7 +240,17 @@ void Ecrire_Fichier(string fichierSortie, vector<int> v){
   os.close();
 }
 
-void Entree_Conteneur(Anneau *a, STATION *s, Echeancier *e, int station,donneAnneau *da,event E){
+void Ecrire_Attente_Station(string fichierSortie, vector<int> v1, vector<double> v2 ){
+  std::ofstream os(fichierSortie);
+  if(os.is_open()){
+    for (int i = 0; i < v1.size(); i++) {
+      os << v1.at(i) << "    " << v2.at(i) << endl;
+    }
+  }
+  os.close();
+}
+
+void Entree_Conteneur(Anneau *a, STATION *s, Echeancier *e, int station,donneAnneau *da, event E){
 
   if(a->anneau.at((150/K)*station)!=-1){
     Event E1;
@@ -261,11 +269,25 @@ void Entree_Conteneur(Anneau *a, STATION *s, Echeancier *e, int station,donneAnn
     E1.station=station;
     e->echeancier.push(E1);
     if(E1.station == 0) {
-      da->AttenteStation1.push_back(E.date-E.tmpArrivee);
 
+      if (da->MoyenneStation1.empty()) {
+        da->MoyenneStation1.push_back(E.date);
+      }
+      else {
+        da->MoyenneStation1.push_back((E.date-da->MoyenneStation1.at(0))/(da->EmissionStation1.size()+1));
+      }
+      da->EmissionStation1.push_back(E.date);
       //std::cout << "attente : " << E.date-E.tmpArrivee << '\n';
     }
-    if(E1.station == 9) da->AttenteStation10.push_back(E.date-E.tmpArrivee);
+    if(E1.station == 9){
+      da->EmissionStation10.push_back(E.date-E.tmpArrivee);
+      if (da->MoyenneStation10.empty()) {
+        da->MoyenneStation10.push_back(da->EmissionStation10.back());
+      }
+      else {
+        da->MoyenneStation10.push_back((da->EmissionStation10.back()+E.date*1.0)/da->EmissionStation10.size());
+      }
+    }
     // std::cout << "Paquets "<< station << " a été traité" << '\n';
     // std::cout << "nombre de paquets traités = " << paquets_traites<< '\n';
     s->v.erase(s->v.begin()+supression_paquet(s,station));
@@ -322,13 +344,13 @@ void simulation(ANNEAU *anneau , STATION *station, echeancier* e){
   for (int i = 0; i < K; i++) {
     init_echeancier(e,dist(rng),inter_arrivees,i);
   }
-  while (horloge < 3500) {
+  while (horloge < 13000) {
     //std::cout << "TEMPS" << horloge << '\n' << '\n';
     exec_evenement(e,anneau,station,dist(rng),inter_arrivees,&AD);
   }
-  Ecrire_Fichier("remplissageAnneau",AD.remplissageAnneau);
-  Ecrire_Fichier("Station1",AD.AttenteStation1);
-  Ecrire_Fichier("Station10",AD.AttenteStation10);
+  Ecrire_Remplissage_Anneau("remplissageAnneau",AD.remplissageAnneau);
+  Ecrire_Attente_Station("Station1",AD.EmissionStation1,AD.MoyenneStation1);
+  Ecrire_Attente_Station("Station10", AD.EmissionStation10, AD.MoyenneStation10);
   std::cout << "taille echeancier : "<<e->echeancier.size() << '\n';
   std::cout << "paquets_totaux : " <<paquets_totaux<< '\n';
   std::cout << "paquets_traites : " <<paquets_traites<< '\n';
