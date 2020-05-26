@@ -1,0 +1,5 @@
+make clean
+make
+R CMD BATCH remplissage.R
+R CMD BATCH station1.R
+R CMD BATCH station10.R
